@@ -1,0 +1,8 @@
+data/
+artifacts/
+*.tar.gz
+.venv/
+__pycache__/
+.pytest_cache/
+benchmark*.json
+samples/*.wav

@@ -1,0 +1,44 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint
+        run: |
+          pip install ruff==0.5.7
+          ruff check src/ scripts/ tests/ --select E4,E7,E9,F
+      - name: Build
+        run: docker build --build-arg EPOCHS=3 -t kws-api:${{ github.sha }} .
+      - name: Start
+        run: docker run -d --name kws -p 8000:8000 kws-api:${{ github.sha }}
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 90); do
+            if curl -fsS http://localhost:8000/health; then exit 0; fi
+            sleep 2
+          done
+          docker logs kws
+          exit 1
+      - name: Smoke test and quality gate
+        env:
+          MIN_ACCURACY: '50'
+        run: |
+          curl -fsS http://localhost:8000/model-info
+          python - <<'PYCODE'
+          import json, os, urllib.request
+          data = json.load(urllib.request.urlopen('http://localhost:8000/model-info'))
+          assert data['accuracy'] >= float(os.environ['MIN_ACCURACY']), data
+          PYCODE
+      - name: Predict smoke test
+        run: |
+          docker cp kws:/app/samples/yes.wav ./yes.wav
+          curl --fail-with-body -X POST -F 'file=@yes.wav' http://localhost:8000/predict
+      - name: Logs on failure
+        if: failure()
+        run: docker logs kws
