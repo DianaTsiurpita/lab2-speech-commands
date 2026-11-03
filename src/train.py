@@ -48,7 +48,9 @@ def main():
     parser.add_argument('--data', default='data/SpeechCommands')
     parser.add_argument('--out', default='artifacts')
     args = parser.parse_args()
-    random.seed(args.seed); np.random.seed(args.seed); torch.manual_seed(args.seed)
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
     torch.set_num_threads(2)
     root = prepare(args.data)
     train = DataLoader(Commands(root, args.classes, 'training'), batch_size=args.batch_size, shuffle=True, num_workers=0)
@@ -59,15 +61,19 @@ def main():
     for epoch in range(args.epochs):
         model.train()
         for x, y in train:
-            optimizer.zero_grad(); loss = torch.nn.functional.cross_entropy(model(x), y)
-            loss.backward(); optimizer.step()
+            optimizer.zero_grad()
+            loss = torch.nn.functional.cross_entropy(model(x), y)
+            loss.backward()
+            optimizer.step()
         print(f'Epoch {epoch + 1}/{args.epochs}, validation accuracy: {accuracy(model, val):.2f}%', flush=True)
-    out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), out / 'model.pt')
     (out / 'labels.json').write_text(json.dumps(args.classes))
     metrics = {'accuracy': round(accuracy(model, test), 3), 'model_version': '1.0.0', 'architecture': 'SpeechCNN', 'epochs': args.epochs, 'seed': args.seed}
     (out / 'metrics.json').write_text(json.dumps(metrics, indent=2))
-    sample_dir = Path('samples'); sample_dir.mkdir(exist_ok=True)
+    sample_dir = Path('samples')
+    sample_dir.mkdir(exist_ok=True)
     for label in args.classes:
         source = next((root / label).glob('*.wav'))
         import shutil
